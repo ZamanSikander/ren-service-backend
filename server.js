@@ -1,3 +1,4 @@
+const axios = require('axios');
 require('dotenv').config();
 const express = require('express');
 const nodemailer = require('nodemailer');
@@ -48,9 +49,10 @@ app.post(
     body('address').trim().notEmpty().withMessage('Address is required'),
     body('city').trim().notEmpty().withMessage('City is required'),
     body('zipCode').trim().notEmpty().withMessage('Zip code is required'),
-    body('message').trim().notEmpty().withMessage('Message is required')
+    body('message').trim().notEmpty().withMessage('Message is required'),
+    body('recaptchaToken').notEmpty().withMessage('reCAPTCHA token is required')
   ],
-  (req, res) => {
+  async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
@@ -66,14 +68,29 @@ app.post(
       zipCode,
       message,
       subject = 'New Contact Form Submission - REN Services',
-      to = process.env.EMAIL_TO
+      to = process.env.EMAIL_TO,
+      recaptchaToken
     } = req.body;
 
-    const mailOptions = {
-      from: process.env.EMAIL_FROM,
-      to,
-      subject,
-      text: `
+    try {
+      // Verify reCAPTCHA token with Google
+      const verifyURL = `https://www.google.com/recaptcha/api/siteverify`;
+      const { data } = await axios.post(verifyURL, null, {
+        params: {
+          secret: process.env.RECAPTCHA_SECRET_KEY,
+          response: recaptchaToken,
+        },
+      });
+
+      if (!data.success || data.score < 0.5) {
+        return res.status(403).json({ error: 'Failed reCAPTCHA verification. You may be a bot.' });
+      }
+
+      const mailOptions = {
+        from: process.env.EMAIL_FROM,
+        to,
+        subject,
+        text: `
 You have received a new contact request from the website:
 
 Name: ${firstName} ${lastName}
@@ -85,18 +102,23 @@ Zip Code: ${zipCode}
 
 Message:
 ${message}
-      `
-    };
+        `
+      };
 
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error('Email send error:', error);
-        return res.status(500).json({ error: 'Failed to send email' });
-      }
-      res.status(200).json({ message: 'Email sent successfully' });
-    });
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.error('Email send error:', error);
+          return res.status(500).json({ error: 'Failed to send email' });
+        }
+        res.status(200).json({ message: 'Email sent successfully' });
+      });
+    } catch (error) {
+      console.error('reCAPTCHA verification failed:', error);
+      return res.status(500).json({ error: 'reCAPTCHA verification failed' });
+    }
   }
 );
+
 
 // Start server
 app.listen(port, () => {
