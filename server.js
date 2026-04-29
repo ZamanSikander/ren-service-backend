@@ -89,16 +89,11 @@ app.post('/send-email', emailLimiter, contactValidation, async (req, res) => {
 
   // --- Step 1: Verify reCAPTCHA ---
   try {
-    const { data: recaptchaData } = await axios.post(
-      'https://www.google.com/recaptcha/api/siteverify',
-      null,
-      {
-        params: {
-          secret: process.env.RECAPTCHA_SECRET_KEY,
-          response: recaptchaToken,
-        },
-      }
+    const recaptchaRes = await fetch(
+      `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${recaptchaToken}`,
+      { method: 'POST' }
     );
+    const recaptchaData = await recaptchaRes.json();
 
     // Log full reCAPTCHA response so you can debug in Vercel logs
     console.log('reCAPTCHA result:', JSON.stringify(recaptchaData));
