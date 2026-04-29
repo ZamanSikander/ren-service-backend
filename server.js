@@ -16,7 +16,7 @@ app.set('trust proxy', 1);
 
 // Middlewares
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || '*', // Set ALLOWED_ORIGIN=https://yourfrontend.com in .env
+  origin: process.env.ALLOWED_ORIGIN || 'http://localhost:3000', // Set ALLOWED_ORIGIN=https://yourfrontend.com in .env
   methods: ['POST', 'GET'],
 }));
 app.use(bodyParser.json());
